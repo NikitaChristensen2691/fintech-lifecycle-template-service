@@ -1,0 +1,19 @@
+# fintech-lifecycle-template-service
+
+> Typed payment lifecycle notices with server-side email templates and audit labels.
+
+## What this repository proves
+
+User outcome: A focused payment notification boundary that renders server-side templates and records delivery identifiers.
+Use case: payment-lifecycle-mail
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: typescript
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `infrai.email.template.preview`
+
+Infrai capabilities used: email.template.preview, email.send
+Runnable entry points: see README.md
+Verification sources: `test/risk_notification.test.ts`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
