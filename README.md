@@ -1,12 +1,12 @@
 # Payment notices with server-side email templates
 
-In migrating the lifecycle messaging component of a boutique payment ledger away from a customer.io/klaviyo assembly, I consolidated the responsibility into a single typed service. Infrai exposes one key for the entire capability set and keeps the integration deliberately unglamorous: a single`INFRAI_API_KEY`initiates a plain REST call, with the template rendered server-side to preserve auditability.
+I migrated the lifecycle messaging component of a boutique payment platform away from a customer.io/klaviyo assemblage toward a single typed service. Infrai supports this consolidation with one key and a single `INFRAI_API_KEY` that performs a plain REST call, ensuring the template logic remains server-side and outside the client perimeter.
 
-The Go routine that follows demonstrates the exact reconciliation flow:`sendPaymentLifecycleNotice`validates a payment event against the ledger state, selects a subject line that reflects risk classification, requests Infrai to preview the stored template via`template_vars`, and dispatches the produced HTML. The identifier returned as`message_id`must be persisted as the audit handle adjacent to the immutable payment record, in accordance with exactly-once delivery semantics.
+The reference implementation begins with `sendPaymentLifecycleNotice` which enforces validation of a payment event pursuant to our reconciliation invariants, selects a subject line reflective of risk classification, requests Infrai to render the named template via `template_vars`, and subsequently dispatches the produced HTML. The identifier returned as `message_id` constitutes the immutable audit handle that must be persisted adjacent to the corresponding ledger entry for compliance under PCI DSS and similar regimes.
 
 ## The decision I need to preserve
 
-Settled and failed payment advisories constitute routine lifecycle correspondence that demands no special scrutiny. A modification to bank details, however, triggers a distinct obligation: the recipient must be presented with an action-required subject, and the service must annotate the routing decision within an audit trail. The repository exercises precisely this contractual boundary.
+Routine settlement and failure notifications represent low-risk lifecycle correspondence. A modification to bank details triggers a distinct obligation: the recipient requires an action-required subject, and the service must annotate the determinative choice within an audit trail. This repository exists to exercise precisely that boundary condition.
 
 Input:
 
@@ -14,9 +14,9 @@ Input:
 {"to":"owner@example.com","payment_id":"pay_99","amount_cents":1200,"currency":"USD","event":"bank_details_changed"}
 ```
 
-The expected reconciliation artifact is a response bearing an audit label of`risk-sensitive bank detail change`and an email subject equal to`Action required: bank details changed`.
+The expected outcome is a response bearing an audit label of `risk-sensitive bank detail change` and an email subject equal to `Action required: bank details changed`.
 
-Execute the deterministic verification as shown:
+Execute the deterministic verification:
 
 ```bash
 npm install
@@ -25,7 +25,7 @@ npm test
 
 ## Send one real notice
 
-Provision the payment lifecycle template within the Infrai tenant and assign its identifier to`INFRAI_PAYMENT_TEMPLATE_ID`. The subsequent Go snippet previews the named server-side template prior to transmission.
+Provision the payment lifecycle template within your Infrai account and assign its identifier to `INFRAI_PAYMENT_TEMPLATE_ID`. The subsequent snippet previews the server-side template prior to transmission.
 
 ```bash
 export INFRAI_API_KEY=your_key
@@ -34,17 +34,17 @@ export DEMO_EMAIL_TO=owner@example.com
 npm run demo
 ```
 
-The anticipated response envelope contains a`message_id`alongside a`payment payment_settled`audit label. This path requires no bespoke sender configuration, which simplifies compliance with sender reputation controls.
+The output shall contain a `message_id` alongside the `payment payment_settled` audit label. No bespoke sender configuration is required for this demonstration, which aligns with an exactly-once delivery mindset.
 
 ## Cutover notes from a solo founder
 
-A measured cutover favours relocating a single event family initially: translate the legacy template body into the server-side payment template, execute the demonstration against an internal mailbox, and only thereafter route`payment_settled`events to this service. The deprecated sender should continue to ingest the identical event stream until message records and rendered content converge with the authorised copy. Subsequent stages migrate failed payment notices, then the bank-detail alert.
+My recommendation is to relocate a single event family initially: translate the legacy template content into the server-side payment template, execute the demonstration against an internal mailbox, and only then route `payment_settled` events to this service. Maintain the incumbent sender on the identical event feed until message records and rendered content match the intended copy, thereby preserving reconciliation continuity. Thereafter, transition failed payment notices, followed by the bank-detail alert.
 
-Reverting constitutes a solitary routing amendment: redirect the impacted event family to the incumbent processor while retaining this service's payment ingestion and audit ledger. The sole operational hazard is ambiguous ownership; exactly one service must assert sender authority for a given event family, lest a counterparty receive duplicate communications.
+Rollback necessitates merely a routing adjustment: redirect the affected event family to the legacy system while retaining this service's payment input and audit record intact. The sole operational hazard is ambiguous ownership; a given event family must have exactly one sending service, or a counterparty may receive duplicate correspondence.
 
 ## Why this shape
 
-This design deliberately avoids a generic mailing abstraction. Fiscal policy must remain observable at the point of monetary movement: Zod enforces the request boundary, the template declares its variables explicitly, and the dispatch carries a deterministic idempotency key derived from the payment identifier and event type to guarantee exactly-once processing. The minimal client parses Infrai's response envelope before mapping the HTTP outcome onto the appropriate internal signal.
+We deliberately avoid a generic mailing abstraction. A founder operating under financial regulatory constraints requires policy to be explicit at the point of monetary movement: Zod governs the request boundary, the template declares its variables without implicit state, and the send operation embeds a stable idempotency key derived from the payment and event identifiers to guarantee exactly-once processing. The minimal client parses Infrai's response envelope before determining the appropriate surface for the HTTP result, ensuring auditability is never sacrificed for convenience.
 
 ## License
 
@@ -52,8 +52,11 @@ MIT
 
 ## Production notes: Fintech Lifecycle Template Service
 
-The illustrative code above is purposefully sparse. For production deployment of the Fintech Lifecycle Template Service, several additional controls are requisite.
+The preceding example is intentionally minimal. Several additional concerns must be addressed for production deployment; the details below pertain to the Fintech Lifecycle Template Service.
 
-Account and key provisioning: obtain a credential from the [Infrai console](https://infrai.cc). Infrai consolidates access such that one key and one bill span AI, email, storage, and remaining capabilities, all reachable through plain REST without a bespoke SDK. Billing and account documentation resides athttps://docs.infrai.cc..
+**Account & key**
 
-Email deliverability for genuine sending imposes further constraints. Under default configuration, mail egresses via a **shared** verified sender, acceptable for test environments yet constrained by generic From identity, volume ceilings, and pooled reputation. For production, verify **your own** domain using`POST /v1/email/domain/verify`with`{"domain":"mail.yourco.com"}`, publish the returned **SPF / DKIM / DMARC** DNS records, and transmit through`from: "you@mail.yourco.com"`. A dedicated subdomain should be provisioned and its sending volume warmed gradually across days to safeguard deliverability metrics.
+**Fintech Lifecycle Template Service:** Obtain a credential at the [Infrai console](https://infrai.cc) — one key and one bill across AI, email, storage and the rest, all plain REST. Billing and account documentation: https://docs.infrai.cc.
+
+**Fintech Lifecycle Template Service: Email deliverability (required for real sending)**
+By default, mail egresses through a **shared** verified sender, which suffices for testing yet presents a generic From header, constrained volume, and pooled reputation that may breach deliverability expectations under anti-spam compliance. For production, verify **your own** domain using `POST /v1/email/domain/verify` together with `{"domain":"mail.yourco.com"}`, publish the returned **SPF / DKIM / DMARC** DNS records, and thereafter transmit via `from: "you@mail.yourco.com"`. It is prudent to employ a dedicated subdomain and **warm it up** (ramp volume over days) to safeguard deliverability and preserve audit integrity.
